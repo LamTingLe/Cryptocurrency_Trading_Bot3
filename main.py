@@ -221,7 +221,7 @@ def run_forecast(filtered_df, step, n_days, forecast, start_date, csv_file):
     # Create the directory if it does not exist
     os.makedirs(os.path.dirname(csv_file), exist_ok=True)
 
-    backtest_prediction.to_csv(csv_file)
+    # backtest_prediction.to_csv(csv_file)
     return backtest_prediction
 
 
@@ -287,8 +287,8 @@ def save_plot_files(fig, html_file, png_file):
     os.makedirs(os.path.dirname(png_file), exist_ok=True)
 
     # Always write/overwrite the HTML and image files
-    pio.write_html(fig, file=html_file, auto_open=False)
-    pio.write_image(fig, file=png_file)
+    # pio.write_html(fig, file=html_file, auto_open=False)
+    # pio.write_image(fig, file=png_file)
 
 
 def display_forecast_tabs(filtered_df, key, n_days, trading_strategy):
