@@ -1,6 +1,7 @@
 import datetime
 
 import numpy as np
+import pandas as pd
 from sklearn.linear_model import LinearRegression
 import streamlit as st
 
@@ -29,6 +30,10 @@ class TradingBot:
         self.buy_timestamp = None
         self.num_buys = 0
         self.num_sells = 0
+
+        # Initialize the trades DataFrame
+        self.trades = pd.DataFrame(columns=['Buy Timestamp', 'Buy Price', 'Sell Timestamp', 'Sell Price',
+                                            'Profit', 'Return Rate'])
 
     def calculate_price_change(self, current_price):
         if self.buy_price:
@@ -78,6 +83,10 @@ class TradingBot:
         self.num_buys += 1  # Increment the buy counter
         self.capital -= current_price  # Deduct the buy price from the capital
 
+        # Add a new row to the trades DataFrame for the buy operation
+        new_trade = pd.DataFrame({'Buy Timestamp': [timestamp], 'Buy Price': [current_price]})
+        self.trades = pd.concat([self.trades.dropna(axis=1, how='all'), new_trade], ignore_index=True)
+
     def sell(self, current_price, timestamp):
         if not self.holding_crypto:
             st.write("No cryptocurrency to sell.")
@@ -90,6 +99,14 @@ class TradingBot:
         # Calculate profit
         profit = current_price - self.buy_price
         self.net_profit_gains.append(profit)  # Renamed from profit_gains
+
+        return_rate = (profit / self.buy_price) * 100 if self.buy_price != 0 else 0
+
+        # Update the last row of the trades DataFrame for the sell operation
+        self.trades.at[self.trades.index[-1], 'Sell Timestamp'] = timestamp
+        self.trades.at[self.trades.index[-1], 'Sell Price'] = current_price
+        self.trades.at[self.trades.index[-1], 'Profit'] = profit
+        self.trades.at[self.trades.index[-1], 'Return Rate'] = return_rate
 
         # Update trade counts
         self.total_trades += 1
@@ -155,6 +172,19 @@ class TradingBot:
         net_profit = self.get_final_capital() - self.get_initial_capital()
         roi = (net_profit / self.get_initial_capital()) * 100
         return roi
+
+    def calculate_roi_per_trade(self):
+        if not self.buy_price:
+            return 0
+        net_profit_per_trade = self.sell_points[-1][1] - self.buy_price if self.sell_points else 0
+        roi_per_trade = (net_profit_per_trade / self.buy_price) * 100
+        return roi_per_trade
+
+    def calculate_average_return_rate(self):
+        if not self.trades.empty:
+            return self.trades['Return Rate'].mean()
+        else:
+            return 0
 
     # def update_metrics(self):
     #     # Update the metrics here

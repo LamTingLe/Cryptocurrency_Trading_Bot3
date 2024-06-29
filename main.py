@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd  # pandas
 import plotly.graph_objects as go  # plotly
 import streamlit as st  # streamlit
-from sklearn.metrics import mean_absolute_error, mean_absolute_percentage_error, mean_squared_error, r2_score
+from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 from streamlit_autorefresh import st_autorefresh  # streamlit autorefresh
 from stqdm import stqdm  # streamlit progress bar
 import plotly.io as pio  # plotly
@@ -14,6 +14,7 @@ import plotly.io as pio  # plotly
 from data import update_crypto_data, preprocess_crypto_data
 from prediction1 import find_best_lag, lr_model_v2
 from trading_bot import TradingBot
+
 pio.json.config.default_engine = 'json'
 
 title = 'Cryptocurrency Price Prediction and Trading Simulation'
@@ -24,7 +25,8 @@ st.set_page_config(page_title=title,
                    initial_sidebar_state='collapsed')  # set page layout to wide
 st_autorefresh(interval=1000 * 60 * 60, limit=None, debounce=True, key=None)
 
-cryptocurrencies_dict = {'BTC': 'Bitcoin', 'ETH': 'Ethereum', 'XRP': 'Ripple'}
+cryptocurrencies_dict = {'BTC': 'Bitcoin', 'ETH': 'Ethereum', 'XRP': 'Ripple', 'LINK': 'Chainlink', 'MATIC': 'Polygon',
+                         'UNI': 'Uniswap Protocol'}
 trading_strategies = ['Price Prediction Strategy', 'Momentum Strategy', 'Trend Analysis Strategy']
 forecasts = [1, 3, 6, 12]
 target = 'close'
@@ -46,6 +48,8 @@ def display_and_plot_crypto_data(key, value):
     temp_df = display_crypto_data(key)
 
     plot_crypto_data(temp_df, key)
+
+    display_price_metrics(temp_df)
 
     display_metric(temp_df, key, 3)
 
@@ -76,6 +80,39 @@ def plot_crypto_data(df, key):
     fig.update_layout(title=f'{key}USD Historical Close Price', xaxis_title='Date', yaxis_title='Price (USD)',
                       legend_title='Legend', showlegend=True, autosize=True)
     st.plotly_chart(fig, theme='streamlit', use_container_width=True)
+
+
+def display_price_metrics(df):
+    # Convert the string to a datetime object
+    date = pd.to_datetime('2024-03-10').date()  # Convert to datetime.date
+
+    # Filter the DataFrame for the specific date
+    df_date = df[df.index.date <= date]
+
+    st.subheader(f'Price Metrics (Data up to {date.strftime("%d %B %Y")})', anchor=False, divider='violet')
+
+    # Calculate the metrics
+    highest_price = df_date['high'].max()
+    lowest_price = df_date['low'].min()
+    starting_price = df_date['open'].iloc[0]
+    latest_close_price = df_date['close'].iloc[-1]
+
+    # Get the date and time of the metrics
+    highest_price_time = df_date['high'].idxmax()
+    lowest_price_time = df_date['low'].idxmin()
+    starting_price_time = df_date['open'].index[0]
+    latest_close_price_time = df_date['close'].index[-1]
+
+    # Display the metrics using Streamlit cards
+    cols = st.columns(4)
+    with cols[0]:
+        st.metric(label=f"Highest Price\n{highest_price_time}", value=highest_price)
+    with cols[1]:
+        st.metric(label=f"Lowest Price\n{lowest_price_time}", value=lowest_price)
+    with cols[2]:
+        st.metric(label=f"Starting Price\n{starting_price_time}", value=starting_price)
+    with cols[3]:
+        st.metric(label=f"Latest Close Price\n{latest_close_price_time}", value=latest_close_price)
 
 
 def display_metric(df, label, hour):
@@ -282,7 +319,7 @@ def display_forecast_tabs(filtered_df, key, n_days, trading_strategy):
 
             actual = filtered_df.loc[backtest_prediction.index][[target]]
 
-            # display_evaluation_metrics(actual, backtest_prediction)
+            evaluate_predictions(csv_file, target, filtered_df)
 
             bot = TradingBot()
 
@@ -362,30 +399,35 @@ def plot_profit_loss_distribution(bot):
 # Define a function to calculate the metrics
 def calculate_metrics(y_test, y_pred):
     mae = mean_absolute_error(y_test, y_pred)
-    mape = mean_absolute_percentage_error(y_test, y_pred)
     mse = mean_squared_error(y_test, y_pred)
     rmse = mse ** (1 / 2)
     r2 = r2_score(y_test, y_pred)
-    return mae, mape, mse, rmse, r2
+    return mae, mse, rmse, r2
 
 
 def display_evaluation_metrics(actual, backtest_prediction):
     # Calculate the evaluation metrics
-    mae, mape, mse, rmse, r2 = calculate_metrics(actual, backtest_prediction)
+    mae, mse, rmse, r2 = calculate_metrics(actual, backtest_prediction)
 
     # Display the evaluation metrics using Streamlit cards
     st.subheader('Evaluation Metrics')
-    cols = st.columns(5)
+    cols = st.columns(4)
     with cols[0]:
-        st.metric(label="Mean Absolute Error", value=f"{mae:.2f}")
+        st.metric(label="Mean Absolute Error", value=f"{mae:.4f}")
     with cols[1]:
-        st.metric(label="Mean Absolute Percentage Error", value=f"{mape:.2f}")
+        st.metric(label="Mean Squared Error", value=f"{mse:.6f}")
     with cols[2]:
-        st.metric(label="Mean Squared Error", value=f"{mse:.2f}")
+        st.metric(label="Root Mean Squared Error", value=f"{rmse:.4f}")
     with cols[3]:
-        st.metric(label="Root Mean Squared Error", value=f"{rmse:.2f}")
-    with cols[4]:
-        st.metric(label="R2 Score", value=f"{r2:.2f}")
+        st.metric(label="R2 Score", value=f"{r2:.4f}")
+
+
+def evaluate_predictions(csv_file, target, filtered_df):
+    backtest_prediction = pd.read_csv(csv_file, index_col=0, parse_dates=True)
+    actual_values = backtest_prediction.index.to_series().apply(lambda x: filtered_df.loc[x, target])
+    predicted_values = backtest_prediction['Linear Regression']
+
+    display_evaluation_metrics(actual_values, predicted_values)
 
 
 def display_trading_metrics(bot):
@@ -404,6 +446,8 @@ def display_trading_metrics(bot):
     average_profit_per_successful_trade = bot.average_profit_per_successful_trade()
     average_trade_duration = bot.average_trade_duration()
     roi = bot.calculate_roi()
+    roi_per_trade = bot.calculate_roi_per_trade()
+    average_return_rate = bot.calculate_average_return_rate()
 
     cols = st.columns(3, gap='small')
     with cols[0]:
@@ -428,6 +472,12 @@ def display_trading_metrics(bot):
         st.metric(label="Total Profit", value=total_profit, delta_color='normal', label_visibility='visible')
         st.metric(label="Failed Trades", value=failed_trades, delta_color='normal', label_visibility='visible')
         st.metric(label="Win Rate", value=win_rate, delta_color='normal', label_visibility='visible')
+        st.metric(label="ROI per Trade", value=roi_per_trade, delta_color='normal', label_visibility='visible')
+
+    st.subheader('Trades', anchor=False, divider='violet')
+    st.dataframe(bot.trades)
+
+    st.metric(label="Average Return Rate", value=average_return_rate, delta_color='normal', label_visibility='visible')
 
 
 st.title(title, anchor=False)
