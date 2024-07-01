@@ -28,7 +28,7 @@ st_autorefresh(interval=1000 * 60 * 60, limit=None, debounce=True, key=None)
 cryptocurrencies_dict = {'BTC': 'Bitcoin', 'ETH': 'Ethereum', 'XRP': 'Ripple', 'LINK': 'Chainlink', 'MATIC': 'Polygon',
                          'UNI': 'Uniswap Protocol'}
 trading_strategies = ['Price Prediction Strategy', 'Momentum Strategy', 'Trend Analysis Strategy']
-forecasts = [1, 3, 6, 12]
+forecasts = [3, 6, 12]
 target = 'close'
 prediction_folder = 'prediction_results'
 trading_strategies_folder = 'trading_strategy_results'
